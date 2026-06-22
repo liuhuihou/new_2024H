@@ -1,0 +1,35 @@
+# 参考工程（不纳入版本控制）
+直线行驶参考/
+
+# Keil 构建产物
+2024H_project/keil/Objects/
+2024H_project/keil/Listings/
+*.axf
+*.hex
+*.bin
+*.o
+*.d
+*.crf
+*.lst
+*.map
+*.htm
+*.lnp
+*.dep
+*.iex
+*.sct.bak
+*.build_log.htm
+*.uvguix.*
+*.bak
+
+# SysConfig 中间产物
+2024H_project/Event.dot
+2024H_project/.metadata/
+syscfg_out.log
+build_log.txt
+run_syscfg.bat
+
+# 编辑器/系统
+.vscode/
+.DS_Store
+Thumbs.db
+*.tmp
