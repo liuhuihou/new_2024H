@@ -160,34 +160,38 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
-    /* OLED 4-wire software SPI control/data lines (plain push-pull outputs). */
     DL_GPIO_initDigitalOutput(OLED_RST_IOMUX);
+
     DL_GPIO_initDigitalOutput(OLED_DC_IOMUX);
+
     DL_GPIO_initDigitalOutput(OLED_SCL_IOMUX);
+
     DL_GPIO_initDigitalOutput(OLED_SDA_IOMUX);
 
     DL_GPIO_clearPins(GPIOA, BIN_BIN1_PIN |
 		BIN_BIN2_PIN |
 		AIN_AIN1_PIN |
-		AIN_AIN2_PIN);
+		AIN_AIN2_PIN |
+		OLED_SCL_PIN |
+		OLED_SDA_PIN);
     DL_GPIO_enableOutput(GPIOA, BIN_BIN1_PIN |
 		BIN_BIN2_PIN |
 		AIN_AIN1_PIN |
-		AIN_AIN2_PIN);
-    /* OLED SCL/SDA idle high on GPIOA. */
-    DL_GPIO_setPins(GPIOA, OLED_SCL_PIN | OLED_SDA_PIN);
-    DL_GPIO_enableOutput(GPIOA, OLED_SCL_PIN | OLED_SDA_PIN);
+		AIN_AIN2_PIN |
+		OLED_SCL_PIN |
+		OLED_SDA_PIN);
     DL_GPIO_setUpperPinsPolarity(GPIOA, DL_GPIO_PIN_25_EDGE_RISE |
 		DL_GPIO_PIN_26_EDGE_RISE);
     DL_GPIO_clearInterruptStatus(GPIOA, ENCODERA_E1A_PIN |
 		ENCODERA_E1B_PIN);
     DL_GPIO_enableInterrupt(GPIOA, ENCODERA_E1A_PIN |
 		ENCODERA_E1B_PIN);
-    DL_GPIO_clearPins(GPIOB, LED_led_PIN);
-    DL_GPIO_enableOutput(GPIOB, LED_led_PIN);
-    /* OLED RST/DC idle high on GPIOB. */
-    DL_GPIO_setPins(GPIOB, OLED_RST_PIN | OLED_DC_PIN);
-    DL_GPIO_enableOutput(GPIOB, OLED_RST_PIN | OLED_DC_PIN);
+    DL_GPIO_clearPins(GPIOB, LED_led_PIN |
+		OLED_RST_PIN |
+		OLED_DC_PIN);
+    DL_GPIO_enableOutput(GPIOB, LED_led_PIN |
+		OLED_RST_PIN |
+		OLED_DC_PIN);
     DL_GPIO_setUpperPinsPolarity(GPIOB, DL_GPIO_PIN_20_EDGE_RISE |
 		DL_GPIO_PIN_24_EDGE_RISE);
     DL_GPIO_clearInterruptStatus(GPIOB, ENCODERB_E2A_PIN |

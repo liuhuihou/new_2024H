@@ -15,9 +15,10 @@
  * On track, the middle two sensors sit on the line -> state == 0b0110.
  */
 
-/* Set to 1 if a sensor reads GPIO HIGH on black, 0 if it reads LOW on black. */
+/* Set to 1 if a sensor reads GPIO HIGH on black, 0 if it reads LOW on black.
+ * LF04 line sensor outputs LOW on black / HIGH on white, so use 0. */
 #ifndef IR_BLACK_IS_HIGH
-#define IR_BLACK_IS_HIGH 1
+#define IR_BLACK_IS_HIGH 0
 #endif
 
 void    IR_Init(void);

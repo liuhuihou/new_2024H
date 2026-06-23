@@ -199,21 +199,19 @@ extern "C" {
 #define IR_DH4_PORT                                                      (GPIOB)
 #define IR_DH4_PIN                                              (DL_GPIO_PIN_17)
 #define IR_DH4_IOMUX                                             (IOMUX_PINCM43)
-
-/* Pin Group OLED: 4-wire software SPI (RST/DC on GPIOB, SCL/SDA on GPIOA). */
-/* Defines for RST: GPIOB.14 with pinCMx 31 */
+/* Defines for RST: GPIOB.14 with pinCMx 31 on package pin 2 */
 #define OLED_RST_PORT                                                    (GPIOB)
 #define OLED_RST_PIN                                            (DL_GPIO_PIN_14)
 #define OLED_RST_IOMUX                                           (IOMUX_PINCM31)
-/* Defines for DC: GPIOB.15 with pinCMx 32 */
+/* Defines for DC: GPIOB.15 with pinCMx 32 on package pin 3 */
 #define OLED_DC_PORT                                                     (GPIOB)
 #define OLED_DC_PIN                                             (DL_GPIO_PIN_15)
 #define OLED_DC_IOMUX                                            (IOMUX_PINCM32)
-/* Defines for SCL: GPIOA.28 with pinCMx 3 */
+/* Defines for SCL: GPIOA.28 with pinCMx 3 on package pin 35 */
 #define OLED_SCL_PORT                                                    (GPIOA)
 #define OLED_SCL_PIN                                            (DL_GPIO_PIN_28)
 #define OLED_SCL_IOMUX                                            (IOMUX_PINCM3)
-/* Defines for SDA: GPIOA.31 with pinCMx 6 */
+/* Defines for SDA: GPIOA.31 with pinCMx 6 on package pin 39 */
 #define OLED_SDA_PORT                                                    (GPIOA)
 #define OLED_SDA_PIN                                            (DL_GPIO_PIN_31)
 #define OLED_SDA_IOMUX                                            (IOMUX_PINCM6)

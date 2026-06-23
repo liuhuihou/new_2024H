@@ -23,7 +23,7 @@
 void Show_Init(void);
 
 /* Refresh dynamic fields. `running` 0 = selecting, 1 = running; `finished`
- * marks a completed run. Pulls the rest from Control_*/IR_*/Path_*. */
+ * marks a completed run. Pulls the rest from Control, IR and Path getters. */
 void Show_Update(PathReq req, uint8_t running, uint8_t finished);
 
 #endif /* _SHOW_H */
