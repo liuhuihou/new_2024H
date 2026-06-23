@@ -15,6 +15,7 @@ static const char *mode_text(ControlMode m)
         case CTRL_STOP:     return "STOP";
         case CTRL_STRAIGHT: return "STRT";
         case CTRL_LINE:     return "LINE";
+        case CTRL_TURN:     return "TURN";
         default:            return "----";
     }
 }

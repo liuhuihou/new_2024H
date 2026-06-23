@@ -37,6 +37,12 @@
 #define LANDMARK_MIN_CNT   3760L  /* ~100 cm: min spacing between counted patches    */
 #define LAP_LANDMARKS         2   /* white patches crossed in one lap               */
 #define CENTERED_TICKS        2   /* ticks centered on the line to call it "on center" */
+
+/* REQ_3: after blind-crossing each white patch, the black line continues at
+ * roughly 80 deg to the car's heading, so pivot to align before following it.
+ * Pivot about the RIGHT wheel (right wheel held, left wheel forward = CW), which
+ * is a negative angle for Control_StartTurn. Flip sign if it turns the wrong way. */
+#define GAP_TURN_DEG     (-80.0f)
 /* require >= 90% lap before a landmark may end the run; hard backstop at 110%. */
 #define LAP_STOP_NUM          9
 #define LAP_STOP_DEN         10
@@ -50,7 +56,7 @@ static int vertices_for_req(PathReq req)
     {
         case REQ_1: return 1;             /* reach B */
         case REQ_2: return LAP_LANDMARKS; /* stadium lap: 2 white-patch crossings */
-        case REQ_3: return 4;             /* C, B, D, A */
+        case REQ_3: return LAP_LANDMARKS; /* same lap follow as REQ_2, after a turn */
         case REQ_4: return 16;            /* 4 laps x 4 vertices */
         default:    return 1;
     }
@@ -59,6 +65,7 @@ static int vertices_for_req(PathReq req)
 typedef enum
 {
     PS_IDLE = 0,
+    PS_TURN,        /* REQ_3: pivot-turn to the entry position before line-follow */
     PS_STRAIGHT,
     PS_LINE,
     PS_CROSS_GAP,   /* REQ_2: blind-driving straight across a white A4 patch */
@@ -107,7 +114,7 @@ static void announce_stop(void)
 void Path_Init(PathReq req)
 {
     g_req          = req;
-    g_lap_mode     = (req == REQ_2) ? 1 : 0;
+    g_lap_mode     = (req == REQ_2 || req == REQ_3) ? 1 : 0;
     g_vertex_goal  = vertices_for_req(req);
     g_state        = PS_IDLE;
     g_vertex_count = 0;
@@ -133,6 +140,7 @@ void Path_Start(void)
     Control_ResetDistance();
     Control_SetBaseSpeed(BASE_RPM);
     Control_SetLineBias(LINE_BIAS);
+
     Control_LockHeading();          /* start straight from the current heading */
     Control_SetMode(CTRL_STRAIGHT);
     g_state = PS_STRAIGHT;
@@ -160,6 +168,21 @@ void Path_Tick(void)
 {
     switch (g_state)
     {
+        case PS_TURN:
+        {
+            /* REQ_3: after blind-crossing a patch, pivot to align with the line,
+             * then resume following it. */
+            if (Control_TurnDone())
+            {
+                g_acquire_streak = 0;
+                Control_ResetDistance();
+                Control_SetMode(CTRL_LINE);
+                g_state = PS_LINE;
+                printf("turn done -> LINE\r\n");
+            }
+            break;
+        }
+
         case PS_STRAIGHT:
         {
             /* Wait until the IR sensors catch the black line. */
@@ -300,8 +323,19 @@ void Path_Tick(void)
                         printf("gap ignored (len=%d cnt)\r\n", gap);
                     }
 
-                    Control_SetMode(CTRL_LINE);
-                    g_state = PS_LINE;
+                    if (g_req == REQ_3)
+                    {
+                        /* REQ_3: line leaves the patch at ~80 deg; pivot about
+                         * the right wheel to align, then follow it. */
+                        Control_StartTurn(GAP_TURN_DEG);
+                        g_state = PS_TURN;
+                        printf("-> TURN %d after gap\r\n", (int)GAP_TURN_DEG);
+                    }
+                    else
+                    {
+                        Control_SetMode(CTRL_LINE);
+                        g_state = PS_LINE;
+                    }
                 }
             }
             else

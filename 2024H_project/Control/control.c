@@ -44,6 +44,12 @@ static float KD_GYRO    = 0.2f;   /* RPM per (deg/s) of yaw rate  */
 static float KP_LINE    = 6.0f;    /* line-follow P (on IR weighted error) */
 static float KD_LINE    = 6.0f;    /* line-follow D (raised to damp exit overshoot) */
 
+/* ---- pivot-turn (CTRL_TURN) tunables ---- */
+#define TURN_RPM        45.0f      /* outer-wheel speed during the turn        */
+#define TURN_RPM_SLOW   22.0f      /* slow-zone speed to limit overshoot       */
+#define TURN_SLOW_DEG   25.0f      /* within this much of target, slow down    */
+#define TURN_TOL_DEG     3.0f      /* consider the turn done within this band  */
+
 /* ---- state ---- */
 static volatile ControlMode g_mode = CTRL_STOP;
 static float g_base_rpm   = 0.0f;     /* forward base speed */
@@ -77,6 +83,10 @@ static int   g_use_gyro    = 0;   /* 1 once the MPU is confirmed present */
  * offset built up on the arc is not carried out across the patch. */
 static int   g_centered_streak = 0;
 
+/* ---- pivot-turn state (CTRL_TURN) ---- */
+static float g_turn_target = 0.0f;   /* signed target angle, deg */
+static int   g_turn_done   = 1;      /* 1 when no turn is in progress */
+
 static float clampf(float v, float lo, float hi)
 {
     if (v > hi) return hi;
@@ -99,6 +109,8 @@ void Control_Init(void)
     g_line_lost_ticks = 0;
     g_head_target = 0.0f;
     g_centered_streak = 0;
+    g_turn_target = 0.0f;
+    g_turn_done   = 1;
     g_use_gyro = MPU_IsReady();   /* gyro heading hold only if the IMU is up */
     Set_PWM(0, 0);
 }
@@ -153,6 +165,20 @@ int Control_IsCentered(int min_ticks)
 {
     return (g_centered_streak >= min_ticks) ? 1 : 0;
 }
+
+static float absf(float v) { return (v < 0.0f) ? -v : v; }
+
+void Control_StartTurn(float deg)
+{
+    if (g_use_gyro) MPU_ZeroYaw();
+    g_turn_target = deg;
+    g_turn_done   = 0;
+    g_int_left    = 0.0f;
+    g_int_right   = 0.0f;
+    Control_SetMode(CTRL_TURN);
+}
+
+int Control_TurnDone(void) { return g_turn_done; }
 
 void Control_ResetDistance(void)
 {
@@ -249,6 +275,41 @@ void Control_Tick(void)
     {
         g_int_left = g_int_right = 0.0f;
         Set_PWM(0, 0);
+        return;
+    }
+
+    if (g_mode == CTRL_TURN)
+    {
+        /* Pivot about the inner wheel until the gyro reports |yaw| >= |target|.
+         * Completion is by angle magnitude, so it is robust to the gyro's sign
+         * convention; the drive direction is chosen by the target's sign. */
+        float yaw   = g_use_gyro ? MPU_GetYaw() : 0.0f;
+        float remain = absf(g_turn_target) - absf(yaw);   /* deg left to turn */
+
+        if (g_turn_done || remain <= TURN_TOL_DEG)
+        {
+            g_turn_done = 1;
+            g_int_left = g_int_right = 0.0f;
+            Set_PWM(0, 0);
+            return;
+        }
+
+        {
+            float spd = (remain <= TURN_SLOW_DEG) ? TURN_RPM_SLOW : TURN_RPM;
+            int pwm;
+            if (g_turn_target > 0.0f)
+            {
+                /* turn left/CCW: right wheel forward, left wheel held */
+                pwm = speed_pi(spd, g_rpm_right, FF_RIGHT, &g_int_right);
+                Set_PWM(0, pwm);
+            }
+            else
+            {
+                /* turn right/CW: left wheel forward, right wheel held */
+                pwm = speed_pi(spd, g_rpm_left, FF_LEFT, &g_int_left);
+                Set_PWM(pwm, 0);
+            }
+        }
         return;
     }
 

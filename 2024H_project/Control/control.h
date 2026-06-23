@@ -14,12 +14,16 @@
  *                   left/right distance (encoder dead-reckoning, no line).
  *   CTRL_LINE     : follow the black arc using the 4-way IR PD error, with an
  *                   optional curvature feed-forward bias.
+ *   CTRL_TURN     : pivot in place by a target angle (gyro-measured), inner
+ *                   wheel stopped / outer wheel forward, then stop. Forward-only
+ *                   hardware, so this is a pivot (not a spin) about one wheel.
  */
 typedef enum
 {
     CTRL_STOP = 0,
     CTRL_STRAIGHT,
-    CTRL_LINE
+    CTRL_LINE,
+    CTRL_TURN
 } ControlMode;
 
 /* Runtime-tunable gain identifiers (for UART live tuning, see Control/tune.c). */
@@ -60,6 +64,13 @@ float Control_GetYaw(void);                   /* integrated heading (deg), 0 if 
  * least min_ticks consecutive control ticks. Used to wait for re-centering
  * before blind-crossing the white patch. */
 int   Control_IsCentered(int min_ticks);
+
+/* Pivot turn in place by `deg` degrees, measured by the gyro (zeroes yaw at the
+ * call). Sign selects direction: positive = turn left/CCW, negative = right/CW.
+ * The car pivots about the inner wheel (outer wheel forward). Poll
+ * Control_TurnDone() for completion; on completion the wheels are held stopped. */
+void  Control_StartTurn(float deg);
+int   Control_TurnDone(void);
 
 /* Per-segment distance accumulators (encoder counts since last reset). */
 void Control_ResetDistance(void);
