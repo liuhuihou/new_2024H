@@ -49,6 +49,18 @@ ControlMode Control_GetMode(void);
 void  Control_SetBaseSpeed(float rpm);        /* forward base speed (RPM) */
 void  Control_SetLineBias(float bias_rpm);    /* arc feed-forward differential */
 
+/* Lock the current heading as the straight-line target (zeroes gyro yaw). Call
+ * when the car must drive blind in a straight line (e.g. crossing the white
+ * A4 patch) so it holds its present heading instead of drifting. */
+void  Control_LockHeading(void);
+int   Control_UsingGyro(void);                /* 1 if MPU6050 heading hold active */
+float Control_GetYaw(void);                   /* integrated heading (deg), 0 if no IMU */
+
+/* 1 once the car has been laterally centered on the line (IR error 0) for at
+ * least min_ticks consecutive control ticks. Used to wait for re-centering
+ * before blind-crossing the white patch. */
+int   Control_IsCentered(int min_ticks);
+
 /* Per-segment distance accumulators (encoder counts since last reset). */
 void Control_ResetDistance(void);
 int  Control_GetDistanceL(void);

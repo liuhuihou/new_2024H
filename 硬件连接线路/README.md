@@ -14,6 +14,7 @@
 - MCU -> 左/右编码器 -> 速度反馈
 - MCU -> 4 路红外巡线传感器 -> 巡线状态
 - MCU -> OLED 显示屏 -> 状态显示
+- MCU -> MPU6050 (I2C0) -> 航向角(yaw)反馈
 - MCU -> 按键 / 指示灯
 - MCU -> 电池电压采样
 - MCU -> UART0 调试串口
@@ -42,6 +43,8 @@
 | OLED | DC | PB15 | 输出 | `ti_msp_dl_config.h`, `Hardware/oled.c` | OLED 数据/命令选择 |
 | OLED | SCL | PA28 | 输出 | `ti_msp_dl_config.h`, `Hardware/oled.c` | 软件时钟线 |
 | OLED | SDA | PA31 | 输出 | `ti_msp_dl_config.h`, `Hardware/oled.c` | 软件数据线 |
+| MPU6050 | SDA | PA0 | I2C | `ti_msp_dl_config.h`, `Hardware/i2c.c` | 硬件 I2C0 数据线，需上拉 |
+| MPU6050 | SCL | PA1 | I2C | `ti_msp_dl_config.h`, `Hardware/i2c.c` | 硬件 I2C0 时钟线，需上拉 |
 | 按键 | KEY | PA18 | 输入 | `ti_msp_dl_config.h`, `Hardware/key.c` | 按下为低电平 |
 | 指示灯 | LED | PB9 | 输出 | `ti_msp_dl_config.h`, `Hardware/led.c` | 低电平点亮 |
 | 电压采样 | BAT_ADC | PA15 | 模拟输入 | `ti_msp_dl_config.h`, `Hardware/adc.c` | 电池电压采样，软件按分压比 11 计算 |
@@ -117,7 +120,21 @@ OLED 不是硬件 I2C，而是用 GPIO 模拟时序写入：
 - OLED 供电和 MCU 逻辑电平要匹配
 - 如果屏幕不亮，先看 RST/DC/SCL/SDA 是否接反
 
-### 5. 按键与指示灯
+### 5. MPU6050 航向传感器（IMU）
+
+MPU6050 走的是**硬件 I2C0**（不是软件模拟），用于读 Z 轴陀螺仪，积分出航向角（yaw），给直行/盲走过白纸区做航向闭环纠偏：
+- SDA -> PA0
+- SCL -> PA1
+- VCC -> 3.3V，GND -> 共地，AD0 -> 接地（或悬空），器件地址 0x68
+
+`Hardware/i2c.c` 是 I2C0 底层读写，`Hardware/mpu6050.c` 负责初始化、零偏校准和 yaw 积分。接线/使用要点：
+- **SDA/SCL 必须各接一个上拉电阻到 3.3V**（4.7kΩ 左右）。很多 MPU6050 模块板载已带上拉，若用裸芯片必须自己加，否则 I2C 读不到（开机串口会打印 `MPU6050 NOT found`）。
+- I2C0 速率约 100kHz，逻辑 3.3V。
+- 开机后会做**静止零偏校准**（约 0.8s），这期间**车必须静止不动**，否则零偏不准、yaw 会持续漂移。
+- 模块要**水平、牢固**固定在车上（Z 轴朝上），松动会引入额外角度误差。
+- 若没接 MPU6050 或读不到，程序自动回退到“编码器左右轮里程差”做航向保持，仍可运行，只是过弯出弯后直线精度差一些。
+
+### 6. 按键与指示灯
 
 - 按键 KEY -> PA18，按下为低电平
 - LED -> PB9，低电平点亮
@@ -126,14 +143,14 @@ OLED 不是硬件 I2C，而是用 GPIO 模拟时序写入：
 - 按键是低有效
 - 指示灯是低有效
 
-### 6. 电池电压采样
+### 7. 电池电压采样
 
 电池电压采样脚是：
 - PA15 -> ADC1 通道
 
 `Hardware/adc.c` 里按分压比换算电压，当前软件使用的换算系数是 11 倍分压。若以后改了分压电阻，需要同步改 `Hardware/adc.c` 的换算公式。
 
-### 7. 串口通信
+### 8. 串口通信
 
 #### UART0
 
@@ -154,7 +171,7 @@ OLED 不是硬件 I2C，而是用 GPIO 模拟时序写入：
 - MCU RX 接外设 TX
 - 地线必须共地
 
-### 8. SWD 调试下载
+### 9. SWD 调试下载
 
 - PA20 -> SWCLK
 - PA19 -> SWDIO
@@ -171,6 +188,8 @@ OLED 不是硬件 I2C，而是用 GPIO 模拟时序写入：
 | `Hardware/encoder.c` | 编码器脉冲计数 |
 | `Hardware/IR_Module.c` | 4 路巡线传感器读取和巡线状态机 |
 | `Hardware/oled.c` | OLED 驱动 |
+| `Hardware/i2c.c` | 硬件 I2C0 底层读写（MPU6050 用） |
+| `Hardware/mpu6050.c` | MPU6050 初始化、零偏校准、yaw 角积分 |
 | `Hardware/key.c` | 按键扫描 |
 | `Hardware/led.c` | LED 控制 |
 | `Hardware/adc.c` | 电池电压采样 |
@@ -186,7 +205,8 @@ OLED 不是硬件 I2C，而是用 GPIO 模拟时序写入：
 3. 再接编码器，看速度反馈方向和实际是否一致。
 4. 再接 4 路红外，看中间两路是否能稳定识别直行。
 5. 再接 OLED，确认显示数据正常。
-6. 最后接 UART0 / UART1 做打印和 APP 联调。
+6. 接 MPU6050（PA0/PA1，带上拉），上电看串口是否打印 `MPU6050 OK`；校准时车保持静止。
+7. 最后接 UART0 / UART1 做打印和 APP 联调。
 
 ## 六、补充说明
 

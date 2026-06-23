@@ -3,6 +3,7 @@
 #include "path.h"
 #include "tune.h"
 #include "show.h"
+#include "mpu6050.h"
 
 /*
  * 2024 EDC Problem H - autonomous line-following car (TI MSPM0G3507).
@@ -42,6 +43,24 @@ int main(void)
     DL_UART_Main_disableLoopbackMode(UART_0_INST);
 
     DL_Timer_startCounter(PWM_0_INST);
+
+    /* MPU6050 heading sensor (I2C0, PA0/PA1). Init + still-bias calibration must
+     * happen before Control_Init(), which latches whether gyro heading-hold is
+     * available. Keep the car stationary through this. Falls back to encoder
+     * heading-hold if the IMU is absent/unresponsive. */
+    {
+        int mpu_rc = MPU_Init();
+        if (mpu_rc == 0)
+        {
+            printf("MPU6050 OK, calibrating (hold still)...\r\n");
+            MPU_Calibrate(400);          /* ~0.8 s of still samples */
+            printf("MPU6050 calibrated.\r\n");
+        }
+        else
+        {
+            printf("MPU6050 NOT found (rc=%d), using encoder heading.\r\n", mpu_rc);
+        }
+    }
 
     /* Encoder edge interrupts (GROUP1 = GPIOA + GPIOB). */
     NVIC_ClearPendingIRQ(ENCODERA_INT_IRQN);

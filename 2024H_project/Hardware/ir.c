@@ -95,7 +95,7 @@ uint8_t IR_Read(void)
  */
 int IR_Error(void)
 {
-    static const int weight[4] = { -3, -1, +1, +3 };  /* DH1..DH4 */
+    static const int weight[4] = { -3, -2, +2, +3 };  /* DH1..DH4 */
     uint8_t s = IR_Read();
     int sum = 0;
     int n   = 0;

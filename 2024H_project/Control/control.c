@@ -1,5 +1,6 @@
 #include "board.h"
 #include "control.h"
+#include "mpu6050.h"
 
 /*
  * Cascaded motion controller. Runs entirely inside the 10 ms TIMG0 interrupt.
@@ -33,10 +34,15 @@ static float FF_RIGHT   = 58.0f;   /* base PWM per target RPM, right */
 static float INT_LIMIT  = 1500.0f; /* integrator clamp (raised with PWM_LIMIT) */
 
 static float KP_HEADING = 0.20f;   /* straight heading-hold P (on dist diff) */
-static float KD_HEADING = 0.50f;   /* straight heading-hold D */
+static float KD_HEADING = 0.70f;   /* straight heading-hold D */
+
+/* Gyro heading-hold (used in CTRL_STRAIGHT when the MPU6050 is present). The
+ * correction is in RPM per degree of yaw error; the D term damps on yaw rate. */
+static float KP_GYRO    = 4.0f;    /* RPM per deg of heading error */
+static float KD_GYRO    = 0.2f;   /* RPM per (deg/s) of yaw rate  */
 
 static float KP_LINE    = 6.0f;    /* line-follow P (on IR weighted error) */
-static float KD_LINE    = 3.0f;    /* line-follow D */
+static float KD_LINE    = 6.0f;    /* line-follow D (raised to damp exit overshoot) */
 
 /* ---- state ---- */
 static volatile ControlMode g_mode = CTRL_STOP;
@@ -61,6 +67,16 @@ static int   g_prev_line_err = 0;
 static float g_last_line_corr = 0.0f;
 static int   g_line_lost_ticks = 0;
 
+/* Gyro heading hold: target yaw (deg) that CTRL_STRAIGHT tries to maintain. */
+static float g_head_target = 0.0f;
+static int   g_use_gyro    = 0;   /* 1 once the MPU is confirmed present */
+
+/* Consecutive CTRL_LINE ticks the car has been laterally centered on the line
+ * (|IR_Error| == 0, i.e. 0110). The path layer uses this to wait until the car
+ * is back on the centerline before blind-crossing the white patch, so a lateral
+ * offset built up on the arc is not carried out across the patch. */
+static int   g_centered_streak = 0;
+
 static float clampf(float v, float lo, float hi)
 {
     if (v > hi) return hi;
@@ -81,6 +97,9 @@ void Control_Init(void)
     g_prev_line_err = 0;
     g_last_line_corr = 0.0f;
     g_line_lost_ticks = 0;
+    g_head_target = 0.0f;
+    g_centered_streak = 0;
+    g_use_gyro = MPU_IsReady();   /* gyro heading hold only if the IMU is up */
     Set_PWM(0, 0);
 }
 
@@ -101,6 +120,39 @@ void Control_SetMode(ControlMode mode)
 ControlMode Control_GetMode(void)        { return g_mode; }
 void  Control_SetBaseSpeed(float rpm)    { g_base_rpm  = rpm; }
 void  Control_SetLineBias(float bias)    { g_line_bias = bias; }
+
+/*
+ * Lock the current heading as the straight-line target. Zeroes the integrated
+ * yaw so "go straight from here" means "hold yaw == 0". Call this the instant
+ * the car must drive blind (e.g. entering the white A4 patch), so it keeps the
+ * heading it has right now instead of drifting with the curve's exit angle.
+ */
+void Control_LockHeading(void)
+{
+    if (g_use_gyro)
+    {
+        MPU_ZeroYaw();
+    }
+    g_head_target   = 0.0f;
+    g_prev_head_err = 0;
+    g_dist_left  = 0;     /* also reset the odometry fallback reference */
+    g_dist_right = 0;
+    /* Drop the line-follow correction memory so the "steer toward inside"
+     * bias built up on the arc is not carried into the blind straight. */
+    g_last_line_corr = 0.0f;
+    g_prev_line_err  = 0;
+    g_centered_streak = 0;
+}
+
+int Control_UsingGyro(void) { return g_use_gyro; }
+float Control_GetYaw(void)  { return g_use_gyro ? MPU_GetYaw() : 0.0f; }
+
+/* 1 once the car has been laterally centered on the line for at least
+ * `min_ticks` consecutive control ticks. */
+int Control_IsCentered(int min_ticks)
+{
+    return (g_centered_streak >= min_ticks) ? 1 : 0;
+}
 
 void Control_ResetDistance(void)
 {
@@ -172,6 +224,9 @@ void Control_Tick(void)
      * below operate on the debounced state (prevents premature vertex/stop). */
     IR_Update();
 
+    /* Integrate the gyro Z-axis once per tick for heading hold. */
+    if (g_use_gyro) MPU_UpdateYaw();
+
     __disable_irq();
     rawA = Get_Encoder_countA;
     rawB = Get_Encoder_countB;
@@ -199,10 +254,24 @@ void Control_Tick(void)
 
     if (g_mode == CTRL_STRAIGHT)
     {
-        int head_err = g_dist_left - g_dist_right;
-        float corr = KP_HEADING * (float)head_err
-                   + KD_HEADING * (float)(head_err - g_prev_head_err);
-        g_prev_head_err = head_err;
+        float corr;
+        if (g_use_gyro)
+        {
+            /* Gyro heading hold: drive yaw toward the locked target. This holds
+             * a true straight line regardless of wheel slip on the arcs, which
+             * is what stops the car from leaving the straight at the curve's
+             * exit angle while blind-crossing the white patch. corr is RPM. */
+            float yaw_err = MPU_GetYaw() - g_head_target;   /* deg */
+            corr = KP_GYRO * yaw_err + KD_GYRO * MPU_GetGyroZ();
+        }
+        else
+        {
+            /* Fallback (no IMU): hold heading by equalizing wheel distance. */
+            int head_err = g_dist_left - g_dist_right;
+            corr = KP_HEADING * (float)head_err
+                 + KD_HEADING * (float)(head_err - g_prev_head_err);
+            g_prev_head_err = head_err;
+        }
         target_left  = g_base_rpm - corr;
         target_right = g_base_rpm + corr;
         g_line_lost_ticks = 0;
@@ -226,6 +295,10 @@ void Control_Tick(void)
             g_prev_line_err = line_err;
             g_last_line_corr = corr;
             g_line_lost_ticks = 0;
+
+            /* Track how long we've been dead-centered (0110 -> err 0). */
+            if (line_err == 0) g_centered_streak++;
+            else               g_centered_streak = 0;
         }
         target_left  = g_base_rpm + g_line_bias + corr;
         target_right = g_base_rpm - g_line_bias - corr;
