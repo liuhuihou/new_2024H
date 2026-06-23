@@ -2,12 +2,26 @@
 
 /*
  * IR sensor pins are configured as pull-up inputs by SysConfig
- * (DH1/DH2 on GPIOA, DH3/DH4 on GPIOB). No runtime init is required, but
- * IR_Init() is provided for symmetry and future use.
+ * (DH1/DH2 on GPIOA, DH3/DH4 on GPIOB). No runtime init is required.
+ *
+ * Readings are passed through a per-bit integrate-and-hold glitch filter
+ * (see IR_FILTER_N): each sensor has a small up/down counter, and its reported
+ * bit only flips after IR_FILTER_N consecutive raw samples agree. This removes
+ * the transient "all white" mis-reads that were being mistaken for an arc end
+ * (premature stop). IR_Update() must be called once per control tick to clock
+ * the filter; IR_Read() returns the filtered state.
  */
+
+/* Per-sensor integrators (0..IR_FILTER_N) and the debounced output bits. */
+static uint8_t s_count[4]  = {0, 0, 0, 0};
+static uint8_t s_filtered  = 0;   /* stable 4-bit state, MSB = DH1 */
+
 void IR_Init(void)
 {
-    /* nothing to do: pins set up in SYSCFG_DL_GPIO_init */
+    int i;
+    for (i = 0; i < 4; i++)
+        s_count[i] = 0;
+    s_filtered = 0;
 }
 
 /* Return 1 if the given sensor is over black, applying the polarity option. */
@@ -20,11 +34,8 @@ static uint8_t ir_sensor_active(uint32_t raw_level)
 #endif
 }
 
-/*
- * Read all four sensors into a 4-bit state, MSB = DH1 (leftmost).
- * bit set => that sensor is on the black line.
- */
-uint8_t IR_Read(void)
+/* Read the four sensors once, polarity-corrected, MSB = DH1 (leftmost). */
+uint8_t IR_ReadRaw(void)
 {
     uint32_t dh1 = DL_GPIO_readPins(IR_DH1_PORT, IR_DH1_PIN);
     uint32_t dh2 = DL_GPIO_readPins(IR_DH2_PORT, IR_DH2_PIN);
@@ -37,6 +48,43 @@ uint8_t IR_Read(void)
     s |= (uint8_t)(ir_sensor_active(dh3) << 1);
     s |= (uint8_t)(ir_sensor_active(dh4) << 0);
     return s;
+}
+
+/*
+ * Clock the glitch filter with one fresh sample. For each bit: count up toward
+ * IR_FILTER_N while raw=black, down toward 0 while raw=white; the reported bit
+ * is set only at the top of the count and cleared only at the bottom, giving
+ * full hysteresis (a change needs IR_FILTER_N consecutive agreeing samples).
+ */
+void IR_Update(void)
+{
+    uint8_t raw = IR_ReadRaw();
+    int i;
+
+    for (i = 0; i < 4; i++)
+    {
+        uint8_t mask = (uint8_t)(1U << (3 - i));   /* bit3 = DH1 */
+
+        if (raw & mask)
+        {
+            if (s_count[i] < IR_FILTER_N) s_count[i]++;
+            if (s_count[i] >= IR_FILTER_N) s_filtered |= mask;   /* confirm black */
+        }
+        else
+        {
+            if (s_count[i] > 0) s_count[i]--;
+            if (s_count[i] == 0) s_filtered &= (uint8_t)~mask;   /* confirm white */
+        }
+    }
+}
+
+/*
+ * Return the filtered 4-bit state, MSB = DH1 (leftmost).
+ * bit set => that sensor is debounced "on the black line".
+ */
+uint8_t IR_Read(void)
+{
+    return s_filtered;
 }
 
 /*

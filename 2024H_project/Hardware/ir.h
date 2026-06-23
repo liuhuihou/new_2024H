@@ -21,8 +21,20 @@
 #define IR_BLACK_IS_HIGH 0
 #endif
 
+/* Digital glitch filter depth, in 10 ms control ticks. A sensor bit only
+ * changes its reported state after IR_FILTER_N consecutive raw samples agree,
+ * so transient mis-reads (reflections, line gaps, edge-of-arc, electrical
+ * noise) lasting up to (IR_FILTER_N - 1) ticks are rejected. This stops a
+ * brief false "all white" from being counted as a vertex (premature stop).
+ * Larger = steadier but slower to confirm a real change. */
+#ifndef IR_FILTER_N
+#define IR_FILTER_N 3
+#endif
+
 void    IR_Init(void);
-uint8_t IR_Read(void);        /* 4-bit state, bit set = on black line */
+void    IR_Update(void);      /* sample + filter; call once per control tick */
+uint8_t IR_Read(void);        /* filtered 4-bit state, bit set = on black line */
+uint8_t IR_ReadRaw(void);     /* unfiltered instantaneous state (debug only) */
 int     IR_Error(void);       /* weighted position error, 0 = centered */
 uint8_t IR_OnLine(void);      /* any sensor on black (state != 0) */
 uint8_t IR_AllWhite(void);    /* no sensor on black (state == 0) */

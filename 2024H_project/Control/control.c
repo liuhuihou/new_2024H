@@ -168,6 +168,10 @@ void Control_Tick(void)
     int left_count, right_count;
     float target_left, target_right;
 
+    /* Clock the IR glitch filter once per tick so IR_AllWhite()/IR_Error()
+     * below operate on the debounced state (prevents premature vertex/stop). */
+    IR_Update();
+
     __disable_irq();
     rawA = Get_Encoder_countA;
     rawB = Get_Encoder_countB;
