@@ -569,6 +569,11 @@
               <FileType>1</FileType>
               <FilePath>..\Hardware\ir.c</FilePath>
             </File>
+            <File>
+              <FileName>oled.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hardware\oled.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -588,6 +593,11 @@
               <FileName>tune.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Control\tune.c</FilePath>
+            </File>
+            <File>
+              <FileName>show.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Control\show.c</FilePath>
             </File>
           </Files>
         </Group>

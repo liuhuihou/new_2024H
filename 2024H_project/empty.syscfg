@@ -16,6 +16,7 @@ const GPIO4   = GPIO.addInstance();
 const GPIO5   = GPIO.addInstance();
 const GPIO6   = GPIO.addInstance();
 const GPIO7   = GPIO.addInstance();
+const GPIO8   = GPIO.addInstance();
 const PWM     = scripting.addModule("/ti/driverlib/PWM", {}, false);
 const PWM1    = PWM.addInstance();
 const SYSCTL  = scripting.addModule("/ti/driverlib/SYSCTL");
@@ -124,6 +125,19 @@ GPIO7.associatedPins[3].$name            = "DH4";
 GPIO7.associatedPins[3].direction        = "INPUT";
 GPIO7.associatedPins[3].internalResistor = "PULL_UP";
 GPIO7.associatedPins[3].pin.$assign      = "PB17";
+
+/* OLED 0.96" SSD1306, 4-wire software SPI. RST=PB14 DC=PB15 (PORTB),
+ * SCL=PA28 SDA=PA31 (PORTA). All push-pull outputs, bit-banged in Hardware/oled.c. */
+GPIO8.$name                         = "OLED";
+GPIO8.associatedPins.create(4);
+GPIO8.associatedPins[0].$name       = "RST";
+GPIO8.associatedPins[0].pin.$assign = "PB14";
+GPIO8.associatedPins[1].$name       = "DC";
+GPIO8.associatedPins[1].pin.$assign = "PB15";
+GPIO8.associatedPins[2].$name       = "SCL";
+GPIO8.associatedPins[2].pin.$assign = "PA28";
+GPIO8.associatedPins[3].$name       = "SDA";
+GPIO8.associatedPins[3].pin.$assign = "PA31";
 
 PWM1.$name                      = "PWM_0";
 PWM1.timerStartTimer            = true;

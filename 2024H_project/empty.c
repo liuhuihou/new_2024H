@@ -2,6 +2,7 @@
 #include "control.h"
 #include "path.h"
 #include "tune.h"
+#include "show.h"
 
 /*
  * 2024 EDC Problem H - autonomous line-following car (TI MSPM0G3507).
@@ -32,6 +33,7 @@ static void print_banner(void)
 int main(void)
 {
     uint32_t telemetry = 0;
+    uint32_t oled_div  = 0;
 
     SYSCFG_DL_init();
 
@@ -61,6 +63,7 @@ int main(void)
     NVIC_EnableIRQ(TIMER_0_INST_INT_IRQN);
 
     Path_Init(g_selected);
+    Show_Init();
     print_banner();
 
     while (1)
@@ -107,6 +110,12 @@ int main(void)
                     print_banner();
                 }
             }
+        }
+
+        if (++oled_div >= 10U)   /* refresh OLED ~ every 100 ms */
+        {
+            oled_div = 0;
+            Show_Update(g_selected, g_running, (uint8_t)Path_IsFinished());
         }
 
         delay_ms(10);

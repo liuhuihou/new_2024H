@@ -11,7 +11,7 @@
 /* ---- tunables ---- */
 #define ACQUIRE_N      3        /* ticks of "on line" to confirm arc acquired   */
 #define VERTEX_LOST_N  6        /* ticks of sustained line-loss to call a vertex */
-#define BASE_RPM      55.0f     /* forward base speed for straight + line        */
+#define BASE_RPM      70.0f     /* forward base speed for straight + line        */
 #define LINE_BIAS      0.0f     /* arc curvature feed-forward (0 = pure PD)      */
 
 /* Vertices to pass before the final stop, per requirement. Confirm on bench. */
