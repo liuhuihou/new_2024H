@@ -1,0 +1,9 @@
+flowchart LR
+  E[巡线偏差 e<br/>红外加权] --> PD1[巡线 PD]
+  TH[航向角 θ<br/>陀螺积分] --> PD2[航向 PD]
+  RT[旋转模式<br/>定角控制] --> OUTER
+  PD1 --> OUTER[方向外环<br/>左/右目标转速]
+  PD2 --> OUTER
+  OUTER --> PI[速度内环<br/>每轮 PI + 前馈]
+  FB[编码器转速反馈] --> PI
+  PI --> PWM[PWM 占空比] --> MOT[电机]

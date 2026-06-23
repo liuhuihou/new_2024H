@@ -1,0 +1,28 @@
+flowchart LR
+  subgraph SENS[传感器输入]
+    IR[四路红外 LF04]
+    ENC[正交编码器 x2]
+    MPU[MPU6050 陀螺仪]
+    KEY[按键]
+    BAT[电池采样]
+  end
+  subgraph MCU[MSPM0G3507 主控]
+    FILT[红外采样 + 数字滤波]
+    DEC[编码器正交解码<br/>里程 / 转速]
+    YAW[I2C0 读陀螺<br/>yaw 积分]
+    SM[状态机 + 级联 PID<br/>10ms 控制中断]
+  end
+  subgraph OUT[执行与显示]
+    DRV[电机驱动]
+    M[左 / 右电机]
+    OLED[OLED 显示]
+    LED[LED + 蜂鸣 声光]
+  end
+  IR --> FILT --> SM
+  ENC --> DEC --> SM
+  MPU --> YAW --> SM
+  KEY --> SM
+  BAT --> SM
+  SM -->|PWM / 方向| DRV --> M
+  SM --> OLED
+  SM --> LED

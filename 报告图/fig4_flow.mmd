@@ -1,0 +1,19 @@
+flowchart TD
+  S([上电]) --> INIT[SYSCFG 外设初始化]
+  INIT --> MPUI[MPU6050 初始化<br/>静止零偏校准]
+  MPUI --> EN[使能编码器中断<br/>10ms 控制节拍]
+  EN --> SEL[按键选择要求 1~4]
+  SEL --> ST{双击启动?}
+  ST -->|否| SEL
+  ST -->|是| STR[盲区直行<br/>陀螺航向保持]
+  STR --> Cap{红外捕获黑线?}
+  Cap -->|否| STR
+  Cap -->|是| LINE[弧线巡线<br/>红外 PD]
+  LINE --> W{检测全白<br/>到达顶点?}
+  W -->|否| LINE
+  W -->|是| VTX[声光提示<br/>顶点/里程计数]
+  VTX --> FIN{圈数/里程完成?}
+  FIN -->|是| STOP([停车 + 声光])
+  FIN -->|否, 要求2| STR
+  FIN -->|否, 要求3| TURN[定角支点旋转<br/>陀螺对正弧线]
+  TURN --> LINE
